@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AMP EDIT</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: #0e0e10;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px 12px 40px;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      color: #f4f4f5;
+      letter-spacing: 0.8px;
+    }
+
+    /* Area Preview Canvas */
+    .preview-wrapper {
+      width: 100%;
+      max-width: 340px;
+      aspect-ratio: 9 / 16;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: #1a1a1d;
+      position: relative;
+      margin-bottom: 16px;
+      transition: all 0.25s ease;
+    }
+
+    .preview-wrapper.landscape {
+      max-width: 380px;
+      aspect-ratio: 16 / 9;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Tombol Play/Pause Preview Cepat */
+    .quick-controls {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      max-width: 340px;
+      margin-bottom: 16px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-play {
+      background: #ffffff;
+      color: #111111;
+    }
+
+    .btn-export {
+      background: #2563eb;
+      color: #ffffff;
+    }
+
+    .btn-export.recording {
+      background: #dc2626;
+      animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.75; }
+      100% { opacity: 1; }
+    }
+
+    /* Panel Pengaturan */
+    .controls-panel {
+      width: 100%;
+      max-width: 340px;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control-group label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #a1a1aa;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .control-group label span {
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #3f3f46;
+      background: #27272a;
+      color: #ffffff;
+      font-size: 13px;
+      outline: none;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      border-color: #60a5fa;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      padding: 8px;
+      border-radius: 10px;
+      border: 1px dashed #3f3f46;
+      background: #222225;
+      color: #d4d4d8;
+      font-size: 12px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #ffffff;
+      cursor: pointer;
+    }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .status-text {
+      font-size: 12px;
+      text-align: center;
+      color: #fbbf24;
+      min-height: 16px;
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-title">AMP EDIT</div>
+
+  <!-- Canvas Preview -->
+  <div id="previewWrapper" class="preview-wrapper">
+    <canvas id="playerCanvas" width="720" height="1280"></canvas>
+  </div>
+
+  <!-- Tombol Aksi Utama -->
+  <div class="quick-controls">
+    <button id="btnPlayPause" class="btn btn-play">▶ Play Preview</button>
+    <button id="btnExport" class="btn btn-export">⬇ Export Video</button>
+  </div>
+
+  <div id="statusText" class="status-text"></div>
+
+  <!-- Menu Pengaturan -->
+  <div class="controls-panel">
+    <!-- 1. Input Audio -->
+    <div class="control-group">
+      <label>1. Pilih Audio dari Perangkat</label>
+      <input type="file" id="audioInput" accept="audio/*" />
+    </div>
+
+    <!-- 2. Judul Musik -->
+    <div class="control-group">
+      <label>2. Judul Musik (Berjalan otomatis jika panjang)</label>
+      <input type="text" id="titleInput" value="kau pikir hidup ini harmor (bang jon remix)" placeholder="Masukkan judul lagu..." />
+    </div>
+
+    <!-- 3. Nama Artis (Italic) -->
+    <div class="control-group">
+      <label>3. Nama Artis (Font Miring)</label>
+      <input type="text" id="artistInput" value="nabih ikoo ft jae rmx" placeholder="Masukkan nama artis..." />
+    </div>
+
+    <!-- 4. Cover Foto -->
+    <div class="control-group">
+      <label>4. Ganti Cover Musik</label>
+      <input type="file" id="coverInput" accept="image/*" />
+    </div>
+
+    <!-- 5. Background Foto + Blur & Kecerahan -->
+    <div class="control-group">
+      <label>5. Ganti Background</label>
+      <input type="file" id="bgInput" accept="image/*" />
+    </div>
+
+    <div class="row-2">
+      <div class="control-group">
+        <label>Blur BG: <span id="blurVal">24px</span></label>
+        <input type="range" id="blurInput" min="0" max="60" value="24" />
+      </div>
+      <div class="control-group">
+        <label>Kecerahan BG: <span id="brightVal">55%</span></label>
+        <input type="range" id="brightInput" min="15" max="130" value="55" />
+      </div>
+    </div>
+
+    <!-- 6. Rotasi / Rasio Layar -->
+    <div class="control-group">
+      <label>6. Rotasi & Rasio Layar</label>
+      <select id="orientationSelect">
+        <option value="portrait">Portrait (9 : 16)</option>
+        <option value="landscape">Landscape (16 : 9)</option>
+      </select>
+    </div>
+
+    <!-- 7 & 8. Resolusi & FPS -->
+    <div class="row-2">
+      <div class="control-group">
+        <label>7. Resolusi (Min 720p)</label>
+        <select id="resSelect">
+          <option value="720">720p HD</option>
+          <option value="1080">1080p Full HD</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>8. FPS (Min 30)</label>
+        <select id="fpsSelect">
+          <option value="30">30 FPS</option>
+          <option value="60">60 FPS</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Elemen Audio Tersembunyi -->
+  <audio id="audioPlayer" crossorigin="anonymous"></audio>
+
+  <script>
+    const canvas = document.getElementById("playerCanvas");
+    const ctx = canvas.getContext("2d");
+    const previewWrapper = document.getElementById("previewWrapper");
+
+    // Inputs
+    const audioInput = document.getElementById("audioInput");
+    const titleInput = document.getElementById("titleInput");
+    const artistInput = document.getElementById("artistInput");
+    const coverInput = document.getElementById("coverInput");
+    const bgInput = document.getElementById("bgInput");
+    const blurInput = document.getElementById("blurInput");
+    const brightInput = document.getElementById("brightInput");
+    const blurVal = document.getElementById("blurVal");
+    const brightVal = document.getElementById("brightVal");
+    const orientationSelect = document.getElementById("orientationSelect");
+    const resSelect = document.getElementById("resSelect");
+    const fpsSelect = document.getElementById("fpsSelect");
+    const btnPlayPause = document.getElementById("btnPlayPause");
+    const btnExport = document.getElementById("btnExport");
+    const statusText = document.getElementById("statusText");
+    const audioPlayer = document.getElementById("audioPlayer");
+
+    // State Gambar
+    let coverImg = new Image();
+    let bgImg = new Image();
+    let hasCover = false;
+    let hasBg = false;
+
+    // Web Audio API untuk Spectrum Real-time
+    let audioCtx = null;
+    let analyser = null;
+    let sourceNode = null;
+    let destNode = null;
+    let freqData = null;
+
+    // Variabel Animasi
+    let marqueeOffset = 0;
+    let lastTimestamp = 0;
+    let isRecording = false;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+
+    // Setup Audio Context saat pertama kali berinteraksi
+    function initAudioContext() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        freqData = new Uint8Array(analyser.frequencyBinCount);
+
+        sourceNode = audioCtx.createMediaElementSource(audioPlayer);
+        destNode = audioCtx.createMediaStreamDestination();
+
+        sourceNode.connect(analyser);
+        analyser.connect(audioCtx.destination);
+        sourceNode.connect(destNode);
+      }
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+    }
+
+    // Update Ukuran & Orientasi Canvas (Portrait 9:16 atau Landscape 16:9)
+    function updateCanvasDimensions() {
+      const res = parseInt(resSelect.value, 10);
+      const isLandscape = orientationSelect.value === "landscape";
+
+      if (isLandscape) {
+        previewWrapper.classList.add("landscape");
+        canvas.width = Math.round((res * 16) / 9);
+        canvas.height = res;
+      } else {
+        previewWrapper.classList.remove("landscape");
+        canvas.width = res;
+        canvas.height = Math.round((res * 16) / 9);
+      }
+      marqueeOffset = 0;
+    }
+
+    orientationSelect.addEventListener("change", updateCanvasDimensions);
+    resSelect.addEventListener("change", updateCanvasDimensions);
+
+    // Upload Audio
+    audioInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      audioPlayer.src = url;
+      marqueeOffset = 0;
+      statusText.textContent = "Audio dimuat: " + file.name;
+    });
+
+    // Upload Cover
+    coverInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => {
+        coverImg = img;
+        hasCover = true;
+        if (!hasBg) {
+          bgImg = img;
+          hasBg = true;
+        }
+      };
+      img.src = URL.createObjectURL(file);
+    });
+
+    // Upload Background
+    bgInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => {
+        bgImg = img;
+        hasBg = true;
+      };
+      img.src = URL.createObjectURL(file);
+    });
+
+    // Update Label Blur & Brightness
+    blurInput.addEventListener("input", () => {
+      blurVal.textContent = blurInput.value + "px";
+    });
+    brightInput.addEventListener("input", () => {
+      brightVal.textContent = brightInput.value + "%";
+    });
+
+    // Play / Pause Button
+    btnPlayPause.addEventListener("click", () => {
+      if (!audioPlayer.src) {
+        statusText.textContent = "Silakan pilih file audio terlebih dahulu!";
+        return;
+      }
+      initAudioContext();
+      if (audioPlayer.paused) {
+        audioPlayer.play();
+        btnPlayPause.textContent = "⏸ Pause";
+        statusText.textContent = "";
+      } else {
+        audioPlayer.pause();
+        btnPlayPause.textContent = "▶ Play Preview";
+      }
+    });
+
+    audioPlayer.addEventListener("ended", () => {
+      btnPlayPause.textContent = "▶ Play Preview";
+      marqueeOffset = 0;
+      if (isRecording) {
+        stopExport();
+      }
+    });
+
+    // Helper: Format Waktu
+    function formatTime(sec) {
+      if (!isFinite(sec) || sec < 0) sec = 0;
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${s < 10 ? "0" : ""}${s}`;
+    }
+
+    // Helper: Rounded Rectangle
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    // Helper: Draw Image Cover Fit
+    function drawImageCover(ctx, img, x, y, w, h) {
+      const imgRatio = img.width / img.height;
+      const boxRatio = w / h;
+      let drawW, drawH, offsetX, offsetY;
+
+      if (imgRatio > boxRatio) {
+        drawH = h;
+        drawW = h * imgRatio;
+        offsetX = x - (drawW - w) / 2;
+        offsetY = y;
+      } else {
+        drawW = w;
+        drawH = w / imgRatio;
+        offsetX = x;
+        offsetY = y - (drawH - h) / 2;
+      }
+      ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+    }
+
+    // =========================================================================
+    // RENDER LAYOUT PORTRAIT (9:16)
+    // =========================================================================
+    function renderPortrait(W, H, dt) {
+      const S = W / 720;
+
+      // Kartu Utama
+      const cardW = 556 * S;
+      const cardH = 975 * S;
+      const cardX = (W - cardW) / 2;
+      const cardY = (H - cardH) / 2;
+      const cardR = 54 * S;
+
+      ctx.save();
+      roundRect(ctx, cardX, cardY, cardW, cardH, cardR);
+      ctx.fillStyle = "rgba(42, 42, 44, 0.88)";
+      ctx.fill();
+      ctx.lineWidth = 1.5 * S;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.stroke();
+      ctx.restore();
+
+      // Cover Artwork
+      const covMargin = 34 * S;
+      const covX = cardX + covMargin;
+      const covY = cardY + covMargin;
+      const covSize = cardW - covMargin * 2;
+      const covR = 30 * S;
+
+      ctx.save();
+      roundRect(ctx, covX, covY, covSize, covSize, covR);
+      ctx.clip();
+      if (hasCover) {
+        drawImageCover(ctx, coverImg, covX, covY, covSize, covSize);
+      } else {
+        ctx.fillStyle = "#3a3a3e";
+        ctx.fillRect(covX, covY, covSize, covSize);
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.font = `600 ${22 * S}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText("Pilih Foto Cover", covX + covSize / 2, covY + covSize / 2);
+      }
+      ctx.restore();
+
+      // Judul Lagu (Marquee)
+      const infoY = covY + covSize + 48 * S;
+      const titleAreaX = covX;
+      const titleAreaW = covSize - 68 * S;
+      const titleText = titleInput.value.trim() || "Judul Musik";
+
+      ctx.save();
+      ctx.font = `700 ${24 * S}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      const textWidth = ctx.measureText(titleText).width;
+
+      ctx.beginPath();
+      ctx.rect(titleAreaX, infoY - 28 * S, titleAreaW, 38 * S);
+      ctx.clip();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+
+      if (textWidth > titleAreaW) {
+        const gap = 55 * S;
+        const loopWidth = textWidth + gap;
+        if (!audioPlayer.paused) {
+          marqueeOffset += 48 * S * dt;
+          if (marqueeOffset >= loopWidth) marqueeOffset -= loopWidth;
+        }
+        ctx.fillText(titleText, titleAreaX - marqueeOffset, infoY);
+        ctx.fillText(titleText, titleAreaX - marqueeOffset + loopWidth, infoY);
+      } else {
+        marqueeOffset = 0;
+        ctx.fillText(titleText, titleAreaX, infoY);
+      }
+      ctx.restore();
+
+      // Nama Artis (Italic)
+      const artistY = infoY + 32 * S;
+      const artistText = artistInput.value.trim() || "Nama Artis";
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(titleAreaX, artistY - 24 * S, titleAreaW, 32 * S);
+      ctx.clip();
+      ctx.font = `italic 400 ${21 * S}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+      ctx.textAlign = "left";
+      ctx.fillText(artistText, titleAreaX, artistY);
+      ctx.restore();
+
+      // Spectrum (Lingkaran Kuning)
+      drawSpectrumBars(ctx, covX + covSize - 24 * S, infoY + 4 * S, S);
+
+      // Progress Bar & Durasi
+      const progY = artistY + 68 * S;
+      const progX = covX;
+      const progW = covSize;
+      const progH = 8 * S;
+
+      const currentTime = audioPlayer.currentTime || 11;
+      const duration = isFinite(audioPlayer.duration) && audioPlayer.duration > 0 ? audioPlayer.duration : 40;
+      const progressRatio = Math.min(1, Math.max(0, currentTime / duration));
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
+      roundRect(ctx, progX, progY, progW, progH, progH / 2);
+      ctx.fill();
+
+      const activeW = Math.max(progH, progW * progressRatio);
+      ctx.fillStyle = "#ffffff";
+      roundRect(ctx, progX, progY, activeW, progH, progH / 2);
+      ctx.fill();
+
+      const timeY = progY + 26 * S;
+      ctx.font = `600 ${16 * S}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+      ctx.textAlign = "left";
+      ctx.fillText(formatTime(currentTime), progX, timeY);
+
+      ctx.textAlign = "right";
+      const remaining = Math.max(0, duration - currentTime);
+      ctx.fillText("-" + formatTime(remaining), progX + progW, timeY);
+
+      // Kontrol Ikon
+      const ctrlY = timeY + 58 * S;
+      const centerX = cardX + cardW / 2;
+
+      drawStarOutline(ctx, progX + 54 * S, ctrlY, 5, 19 * S, 8 * S, "rgba(255,255,255,0.65)", 2 * S);
+      drawDoubleTriangle(ctx, centerX - 96 * S, ctrlY, 18 * S, -1, "#ffffff");
+
+      const pauseW = 11 * S;
+      const pauseH = 38 * S;
+      const pauseGap = 10 * S;
+      ctx.fillStyle = "#ffffff";
+      roundRect(ctx, centerX - pauseGap / 2 - pauseW, ctrlY - pauseH / 2, pauseW, pauseH, 3 * S);
+      ctx.fill();
+      roundRect(ctx, centerX + pauseGap / 2, ctrlY - pauseH / 2, pauseW, pauseH, 3 * S);
+      ctx.fill();
+
+      drawDoubleTriangle(ctx, centerX + 96 * S, ctrlY, 18 * S, 1, "#ffffff");
+
+      // Volume Slider
+      const volY = ctrlY + 68 * S;
+      drawSpeakerIcon(ctx, progX + 8 * S, volY, S, false);
+
+      const volBarX = progX + 38 * S;
+      const volBarW = progW - 86 * S;
+      const volBarH = 7 * S;
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
+      roundRect(ctx, volBarX, volY - volBarH / 2, volBarW, volBarH, volBarH / 2);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      roundRect(ctx, volBarX, volY - volBarH / 2, volBarW * 0.72, volBarH, volBarH / 2);
+      ctx.fill();
+
+      drawSpeakerIcon(ctx, progX + progW - 28 * S, volY, S, true);
+
+      // Pil Output Device ("iPhone")
+      const pillW = 172 * S;
+      const pillH = 44 * S;
+      const pillX = centerX - pillW / 2;
+      const pillY = cardY + cardH - pillH - 22 * S;
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+      roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+      ctx.fill();
+
+      drawAirplayWaveIcon(ctx, pillX + 38 * S, pillY + pillH / 2, S);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `600 ${19 * S}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText("iPhone", pillX + 62 * S, pillY + pillH / 2 + 1 * S);
+      ctx.textBaseline = "alphabetic";
+    }
+
+    // =========================================================================
+    // RENDER LAYOUT LANDSCAPE (16:9)
+    // =========================================================================
+    function renderLandscape(W, H, dt) {
+      const S = H / 720;
+
+      // 1. Kartu Utama Landscape (Dark iOS Glass Card di Tengah Layar)
+      const cardW = 1070 * S;
+      const cardH = 540 * S;
+      const cardX = (W - cardW) / 2;
+      const cardY = (H - cardH) / 2;
+      const cardR = 54 * S;
+
+      ctx.save();
+      roundRect(ctx, cardX, cardY, cardW, cardH, cardR);
+      ctx.fillStyle = "rgba(18, 22, 32, 0.90)";
+      ctx.fill();
+      ctx.lineWidth = 1.5 * S;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.10)";
+      ctx.stroke();
+      ctx.restore();
+
+      // 2. Cover Artwork di Sisi Kiri Kartu
+      const covMargin = 34 * S;
+      const covSize = cardH - covMargin * 2;
+      const covX = cardX + covMargin;
+      const covY = cardY + covMargin;
+      const covR = 36 * S;
+
+      ctx.save();
+      roundRect(ctx, covX, covY, covSize, covSize, covR);
+      ctx.clip();
+      if (hasCover) {
+        drawImageCover(ctx, coverImg, covX, covY, covSize, covSize);
+      } else {
+        ctx.fillStyle = "#2b3040";
+        ctx.fillRect(covX, covY, covSize, covSize);
+        ctx.fillStyle = "rgba(255,255,255,0.45)";
+        ctx.font = `600 ${22 * S}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText("Pilih Foto Cover", covX + covSize / 2, covY + covSize / 2);
+      }
+      ctx.restore();
+
+      // 3. Area Kontrol Sisi Kanan Kartu
+      const rightX = covX + covSize + 36 * S;
+      const rightW = cardX + cardW - 38 * S - rightX;
+      const rightCenterX = rightX + rightW / 2;
+
+      // A. Judul Lagu di bagian atas kanan
+      const titleY = cardY + 62 * S;
+      const titleText = titleInput.value.trim() || "Judul Musik";
+      const titleBoxW = rightW - 20 * S;
+
+      ctx.save();
+      ctx.font = `600 ${23 * S}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      const textWidth = ctx.measureText(titleText).width;
+
+      ctx.beginPath();
+      ctx.rect(rightX + 10 * S, titleY - 26 * S, titleBoxW, 36 * S);
+      ctx.clip();
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      ctx.textBaseline = "alphabetic";
+
+      if (textWidth > titleBoxW) {
+        const gap = 55 * S;
+        const loopWidth = textWidth + gap;
+        if (!audioPlayer.paused) {
+          marqueeOffset += 48 * S * dt;
+          if (marqueeOffset >= loopWidth) marqueeOffset -= loopWidth;
+        }
+        ctx.textAlign = "left";
+        ctx.fillText(titleText, rightX + 10 * S - marqueeOffset, titleY);
+        ctx.fillText(titleText, rightX + 10 * S - marqueeOffset + loopWidth, titleY);
+      } else {
+        marqueeOffset = 0;
+        ctx.textAlign = "center";
+        ctx.fillText(titleText, rightCenterX, titleY);
+      }
+      ctx.restore();
+
+      // B. Nama Artis (Font Miring / Italic, di bawah judul)
+      const artistY = titleY + 34 * S;
+      const artistText = artistInput.value.trim() || "Nama Artis";
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rightX + 10 * S, artistY - 22 * S, titleBoxW, 30 * S);
+      ctx.clip();
+      ctx.font = `italic 400 ${20 * S}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+      ctx.textAlign = "center";
+      ctx.fillText(artistText, rightCenterX, artistY);
+      ctx.restore();
+
+      // C. Tombol Lingkaran AirPlay di Posisi Lingkaran Kuning (Kiri Atas Area Kontrol)
+      const badgeR = 22 * S;
+      const badgeX = rightX + badgeR + 4 * S;
+      const badgeY = artistY + 12 * S;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(badgeX, badgeY, badgeR, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
+      ctx.fill();
+      drawAirplayWaveIcon(ctx, badgeX, badgeY - 1 * S, S * 0.95);
+      ctx.restore();
+
+      // Spectrum di sebelah kanan atas area kontrol
+      drawSpectrumBars(ctx, rightX + rightW - 32 * S, badgeY, S * 0.95);
+
+      // D. Blok Lingkaran Hijau (Diturunkan sedikit agar pas tengah atas-bawah)
+      const progY = artistY + 86 * S;
+      const progX = rightX;
+      const progW = rightW;
+      const progH = 8 * S;
+
+      const currentTime = audioPlayer.currentTime || 0;
+      const duration = isFinite(audioPlayer.duration) && audioPlayer.duration > 0 ? audioPlayer.duration : 40;
+      const progressRatio = Math.min(1, Math.max(0, currentTime / duration));
+
+      // Track abu-abu
+      ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
+      roundRect(ctx, progX, progY, progW, progH, progH / 2);
+      ctx.fill();
+
+      // Track putih aktif
+      const activeW = Math.max(progH, progW * progressRatio);
+      ctx.fillStyle = "#ffffff";
+      roundRect(ctx, progX, progY, activeW, progH, progH / 2);
+      ctx.fill();
+
+      // Teks Waktu di bawah Progress Bar
+      const timeY = progY + 26 * S;
+      ctx.font = `600 ${15 * S}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+      ctx.textAlign = "left";
+      ctx.fillText(formatTime(currentTime), progX, timeY);
+
+      ctx.textAlign = "right";
+      const remaining = Math.max(0, duration - currentTime);
+      ctx.fillText("-" + formatTime(remaining), progX + progW, timeY);
+
+      // E. Ikon Kontrol Pemutar (Rewind <<, Pause ||, Forward >>)
+      const ctrlY = timeY + 66 * S;
+
+      drawDoubleTriangle(ctx, rightCenterX - 115 * S, ctrlY, 19 * S, -1, "#ffffff");
+
+      const pauseW = 12 * S;
+      const pauseH = 40 * S;
+      const pauseGap = 11 * S;
+      ctx.fillStyle = "#ffffff";
+      roundRect(ctx, rightCenterX - pauseGap / 2 - pauseW, ctrlY - pauseH / 2, pauseW, pauseH, 3 * S);
+      ctx.fill();
+      roundRect(ctx, rightCenterX + pauseGap / 2, ctrlY - pauseH / 2, pauseW, pauseH, 3 * S);
+      ctx.fill();
+
+      drawDoubleTriangle(ctx, rightCenterX + 115 * S, ctrlY, 19 * S, 1, "#ffffff");
+
+      // F. Volume Slider Bar & Ikon Speaker Kiri-Kanan
+      const volY = ctrlY + 72 * S;
+      drawSpeakerIcon(ctx, progX + 4 * S, volY, S, false);
+
+      const volBarX = progX + 34 * S;
+      const volBarW = progW - 82 * S;
+      const volBarH = 6 * S;
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
+      roundRect(ctx, volBarX, volY - volBarH / 2, volBarW, volBarH, volBarH / 2);
+      ctx.fill();
+
+      const volLevel = 0.78;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.90)";
+      roundRect(ctx, volBarX, volY - volBarH / 2, volBarW * volLevel, volBarH, volBarH / 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(volBarX + volBarW * volLevel, volY, 7 * S, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+
+      drawSpeakerIcon(ctx, progX + progW - 26 * S, volY, S, true);
+
+      // G. Garis Home Indicator Putih di Bagian Bawah Kanan
+      const homeW = 175 * S;
+      const homeH = 6 * S;
+      const homeX = rightCenterX - homeW / 2;
+      const homeY = cardY + cardH - 32 * S;
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      roundRect(ctx, homeX, homeY, homeW, homeH, homeH / 2);
+      ctx.fill();
+    }
+
+    // =========================================================================
+    // RENDER UTAMA KE CANVAS
+    // =========================================================================
+    function renderFrame(timestamp) {
+      if (!lastTimestamp) lastTimestamp = timestamp;
+      const dt = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+
+      const W = canvas.width;
+      const H = canvas.height;
+      const isLandscape = orientationSelect.value === "landscape";
+
+      ctx.clearRect(0, 0, W, H);
+
+      // 1. LAYER BACKGROUND + BLUR & BRIGHTNESS
+      ctx.save();
+      const blurPx = parseFloat(blurInput.value) * (Math.min(W, H) / 720);
+      const brightnessPct = parseFloat(brightInput.value);
+      ctx.filter = `blur(${blurPx}px) brightness(${brightnessPct}%)`;
+
+      if (hasBg) {
+        const pad = 40 * (Math.min(W, H) / 720);
+        drawImageCover(ctx, bgImg, -pad, -pad, W + pad * 2, H + pad * 2);
+      } else {
+        const grad = ctx.createLinearGradient(0, 0, W, H);
+        grad.addColorStop(0, "#4a443f");
+        grad.addColorStop(0.5, "#2b2a29");
+        grad.addColorStop(1, "#18181a");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+      }
+      ctx.restore();
+
+      // 2. RENDER LAYOUT SESUAI ORIENTASI
+      if (isLandscape) {
+        renderLandscape(W, H, dt);
+      } else {
+        renderPortrait(W, H, dt);
+      }
+
+      requestAnimationFrame(renderFrame);
+    }
+
+    // Fungsi Gambar Spectrum Audio
+    function drawSpectrumBars(ctx, centerX, centerY, S) {
+      const barCount = 6;
+      const barWidth = 3.2 * S;
+      const barGap = 4.2 * S;
+      const totalSpecW = barCount * barWidth + (barCount - 1) * barGap;
+      const specStartX = centerX - totalSpecW / 2;
+
+      if (analyser && !audioPlayer.paused) {
+        analyser.getByteFrequencyData(freqData);
+      }
+
+      const idleHeights = [14, 6, 12, 18, 11, 14];
+      for (let i = 0; i < barCount; i++) {
+        let barH = idleHeights[i] * S;
+        if (analyser && !audioPlayer.paused && freqData) {
+          const val = freqData[i * 2 + 1] / 255;
+          const minH = 5 * S;
+          const maxH = 24 * S;
+          barH = minH + val * (maxH - minH);
+        }
+        const bx = specStartX + i * (barWidth + barGap);
+        const by = centerY - barH / 2;
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.70)";
+        roundRect(ctx, bx, by, barWidth, barH, barWidth / 2);
+        ctx.fill();
+      }
+    }
+
+    // Fungsi Gambar Bintang Outline
+    function drawStarOutline(ctx, cx, cy, spikes, outerR, innerR, color, lineW) {
+      let rot = (Math.PI / 2) * 3;
+      let x = cx;
+      let y = cy;
+      const step = Math.PI / spikes;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - outerR);
+      for (let i = 0; i < spikes; i++) {
+        x = cx + Math.cos(rot) * outerR;
+        y = cy + Math.sin(rot) * outerR;
+        ctx.lineTo(x, y);
+        rot += step;
+
+        x = cx + Math.cos(rot) * innerR;
+        y = cy + Math.sin(rot) * innerR;
+        ctx.lineTo(x, y);
+        rot += step;
+      }
+      ctx.closePath();
+      ctx.lineWidth = lineW;
+      ctx.strokeStyle = color;
+      ctx.lineJoin = "round";
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Fungsi Gambar Rewind / Forward
+    function drawDoubleTriangle(ctx, cx, cy, size, dir, color) {
+      ctx.save();
+      ctx.fillStyle = color;
+      const offsets = [-size * 0.55, size * 0.55];
+      offsets.forEach((off) => {
+        ctx.beginPath();
+        if (dir === 1) {
+          ctx.moveTo(cx + off - size * 0.55, cy - size * 0.65);
+          ctx.lineTo(cx + off + size * 0.65, cy);
+          ctx.lineTo(cx + off - size * 0.55, cy + size * 0.65);
+        } else {
+          ctx.moveTo(cx + off + size * 0.55, cy - size * 0.65);
+          ctx.lineTo(cx + off - size * 0.65, cy);
+          ctx.lineTo(cx + off + size * 0.55, cy + size * 0.65);
+        }
+        ctx.closePath();
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+
+    // Fungsi Gambar Speaker
+    function drawSpeakerIcon(ctx, x, y, S, withWaves) {
+      ctx.save();
+      ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+      ctx.lineWidth = 2 * S;
+      ctx.lineCap = "round";
+
+      ctx.beginPath();
+      ctx.moveTo(x, y - 4 * S);
+      ctx.lineTo(x + 5 * S, y - 4 * S);
+      ctx.lineTo(x + 11 * S, y - 9 * S);
+      ctx.lineTo(x + 11 * S, y + 9 * S);
+      ctx.lineTo(x + 5 * S, y + 4 * S);
+      ctx.lineTo(x, y + 4 * S);
+      ctx.closePath();
+      ctx.fill();
+
+      if (withWaves) {
+        [15 * S, 19 * S, 23 * S].forEach((r) => {
+          ctx.beginPath();
+          ctx.arc(x + 10 * S, y, r * 0.55, -0.45, 0.45);
+          ctx.stroke();
+        });
+      }
+      ctx.restore();
+    }
+
+    // Fungsi Gambar Ikon iPhone AirPlay
+    function drawAirplayWaveIcon(ctx, cx, cy, S) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.lineWidth = 1.8 * S;
+
+      [5 * S, 8.5 * S, 12 * S].forEach((r) => {
+        ctx.beginPath();
+        ctx.arc(cx, cy + 1 * S, r, Math.PI * 0.85, Math.PI * 2.15);
+        ctx.stroke();
+      });
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + 2 * S);
+      ctx.lineTo(cx - 5 * S, cy + 9 * S);
+      ctx.lineTo(cx + 5 * S, cy + 9 * S);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // =========================================================================
+    // 8. EXPORT / DOWNLOAD VIDEO KE GALERI PERANGKAT
+    // =========================================================================
+    btnExport.addEventListener("click", () => {
+      if (isRecording) {
+        stopExport();
+        return;
+      }
+
+      if (!audioPlayer.src) {
+        statusText.textContent = "Pilih audio terlebih dahulu sebelum Export!";
+        return;
+      }
+
+      initAudioContext();
+      const fps = parseInt(fpsSelect.value, 10);
+      const canvasStream = canvas.captureStream(fps);
+
+      const combinedTracks = [...canvasStream.getVideoTracks()];
+      if (destNode && destNode.stream) {
+        combinedTracks.push(...destNode.stream.getAudioTracks());
+      }
+      const combinedStream = new MediaStream(combinedTracks);
+
+      let mimeType = "video/webm;codecs=vp9,opus";
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = "video/webm;codecs=vp8,opus";
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = "video/webm";
+      }
+
+      recordedChunks = [];
+      try {
+        mediaRecorder = new MediaRecorder(combinedStream, {
+          mimeType: mimeType,
+          videoBitsPerSecond: 6000000
+        });
+      } catch (err) {
+        mediaRecorder = new MediaRecorder(combinedStream);
+      }
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedChunks.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const cleanTitle = (titleInput.value || "amp_edit").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+        const modeLabel = orientationSelect.value === "landscape" ? "16x9" : "9x16";
+        a.href = url;
+        a.download = `${cleanTitle}_${modeLabel}_${resSelect.value}p_${fps}fps.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        statusText.textContent = "Selesai! Video berhasil diunduh ke folder Download / Galeri.";
+        btnExport.textContent = "⬇ Export Video";
+        btnExport.classList.remove("recording");
+        btnPlayPause.textContent = "▶ Play Preview";
+      };
+
+      audioPlayer.currentTime = 0;
+      marqueeOffset = 0;
+      audioPlayer.play();
+      mediaRecorder.start();
+      isRecording = true;
+
+      btnExport.textContent = "⏹ Stop & Simpan";
+      btnExport.classList.add("recording");
+      btnPlayPause.textContent = "⏸ Pause";
+      statusText.textContent = `Merekam (${orientationSelect.value.toUpperCase()} ${resSelect.value}p ${fps}fps)...`;
+    });
+
+    function stopExport() {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+      }
+      audioPlayer.pause();
+      isRecording = false;
+    }
+
+    requestAnimationFrame(renderFrame);
+  </script>
+</body>
+</html>
+ANSRI
